@@ -126,7 +126,7 @@ export default function Lobby() {
             Danh Sách Phòng  <span style={{ fontSize: 14, color: 'rgba(245,240,232,0.35)', fontFamily: 'Crimson Pro' }}>({rooms.length} phòng)</span>
           </h2>
           <div style={{ display: 'flex', gap: 12 }}>
-            <button className="btn-secondary" onClick={fetchRooms} style={{ fontSize: 14 }}>Lam Moi</button>
+            <button className="btn-secondary" onClick={fetchRooms} style={{ fontSize: 14 }}>Làm Mới</button>
             <button className="btn-primary" onClick={() => setShowCreate(true)}>Tạo Phòng</button>
           </div>
         </div>
