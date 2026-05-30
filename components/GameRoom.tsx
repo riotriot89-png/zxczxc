@@ -34,7 +34,15 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       });
       if (!res.ok) { router.push('/'); return; }
       const data = await res.json();
-      setRoom(data.room);
+      // Only hard-replace if turn/status actually advanced (avoid stomping optimistic state)
+      setRoom(prev => {
+        if (!prev) return data.room;
+        const next = data.room;
+        // If server is ahead (new turn or status change), accept server state
+        if (next.turn > prev.turn || next.status !== prev.status) return next;
+        // Otherwise keep current state (optimistic updates are more current)
+        return prev;
+      });
     } catch {}
     setLoading(false);
   }, [token, roomId, router]);
@@ -45,7 +53,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     fetchRoom();
 
     // Poll as fallback (Pusher may not be configured)
-    pollRef.current = setInterval(fetchRoom, 2000);
+    pollRef.current = setInterval(fetchRoom, 8000); // safety net only, optimistic updates handle UI
 
     // Try Pusher
     try {
@@ -85,7 +93,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
         pusherRef.current = pusher;
         if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = setInterval(fetchRoom, 5000); // slower poll with pusher
+        pollRef.current = setInterval(fetchRoom, 10000); // very slow poll with pusher, events handle updates
       }
     } catch {}
 
@@ -109,10 +117,11 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       body: JSON.stringify(body || {}),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Loi');
-    await fetchRoom();
+    if (!res.ok) throw new Error(data.error || 'Lỗi');
+    // Do NOT fetchRoom() here — Pusher events will update state smoothly.
+    // Fallback poll will sync if Pusher misses anything.
     return data;
-  }, [token, roomId, fetchRoom]);
+  }, [token, roomId]);
 
   const toggleCard = (cardId: string) => {
     setSelectedCards(prev =>
@@ -123,33 +132,54 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const playCards = async () => {
     if (selectedCards.length === 0) return;
     setActionError('');
-    // 1. Trigger fly-out animation on selected cards
-    setFlyingCards(selectedCards);
-    // 2. After fly-out (320ms), optimistically remove from hand & show landing
+    const cardsToPlay = [...selectedCards];
+    const play = identifyPlay(myHand.filter((c: Card) => cardsToPlay.includes(c.id)));
+    if (!play) return;
+
+    // Step 1: animate cards flying out
+    setFlyingCards(cardsToPlay);
+
+    // Step 2: after fly-out, optimistically update local state
     setTimeout(() => {
-      const play = identifyPlay(myHand.filter(c => selectedCards.includes(c.id)));
-      if (play) setLandingPlay(play);
       setFlyingCards([]);
-      // Clear landing animation after it completes
-      setTimeout(() => setLandingPlay(null), 400);
-    }, 280);
-    try {
-      await api('play', { cardIds: selectedCards });
       setSelectedCards([]);
+      setLandingPlay(play);
+      // Optimistically remove played cards from hand & update lastPlay
+      setRoom(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          players: prev.players.map(p =>
+            p.id === user?.id
+              ? { ...p, hand: p.hand.filter((c: Card) => !cardsToPlay.includes(c.id)) }
+              : p
+          ),
+          lastPlay: play,
+          lastPlayerId: user?.id || null,
+        };
+      });
+      setTimeout(() => setLandingPlay(null), 420);
+    }, 300);
+
+    try {
+      await api('play', { cardIds: cardsToPlay });
     } catch (err: any) {
+      // Revert optimistic update on error
       setFlyingCards([]);
       setLandingPlay(null);
       setActionError(err.message);
+      fetchRoom(); // re-sync on error
     }
   };
 
   const pass = async () => {
     setActionError('');
+    setSelectedCards([]);
     try {
       await api('pass');
-      setSelectedCards([]);
     } catch (err: any) {
       setActionError(err.message);
+      fetchRoom();
     }
   };
 
@@ -158,7 +188,17 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   };
 
   const toggleReady = async () => {
-    try { await api('ready'); } catch {}
+    // Optimistic: flip ready state locally
+    setRoom(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        players: prev.players.map(p =>
+          p.id === user?.id ? { ...p, isReady: !p.isReady } : p
+        ),
+      };
+    });
+    try { await api('ready'); } catch { fetchRoom(); }
   };
 
   const sendChat = async (e: React.FormEvent) => {
