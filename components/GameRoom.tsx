@@ -38,22 +38,9 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       setRoom(prev => {
         const next = data.room;
         if (!prev) return next;
-        // Merge server state but preserve our own real hand if server sent hidden cards
-        // (can happen with race between poll and optimistic update)
-        const merged = {
-          ...next,
-          players: next.players.map((serverPlayer: any) => {
-            const localPlayer = prev.players.find((p: any) => p.id === serverPlayer.id);
-            const serverHandIsHidden = serverPlayer.hand.every((c: any) => c.id === 'hidden');
-            const localHasRealCards = localPlayer?.hand.some((c: any) => c.id !== 'hidden');
-            // Keep local hand if server masked it but we have real cards locally
-            if (serverHandIsHidden && localHasRealCards) {
-              return { ...serverPlayer, hand: localPlayer!.hand };
-            }
-            return serverPlayer;
-          }),
-        };
-        return merged;
+        // fetchRoom always returns our real hand (server sends it directly to us)
+        // so always accept — no merge needed here
+        return next;
       });
     } catch {}
     setLoading(false);
@@ -80,16 +67,34 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         const roomChannel = pusher.subscribe(`room-${roomId}`);
         const playerChannel = pusher.subscribe(`player-${user.id}`);
 
+        const mergeRoom = (prev: any, next: any) => {
+          if (!prev) return next;
+          // Preserve our real hand if server sent hidden (public channel doesn't include hands)
+          return {
+            ...next,
+            players: next.players.map((serverPlayer: any) => {
+              const localPlayer = prev.players.find((p: any) => p.id === serverPlayer.id);
+              const serverHidden = serverPlayer.hand.every((c: any) => c.id === 'hidden');
+              const localReal = localPlayer?.hand.some((c: any) => c.id !== 'hidden');
+              if (serverHidden && localReal) {
+                return { ...serverPlayer, hand: localPlayer!.hand };
+              }
+              return serverPlayer;
+            }),
+          };
+        };
+
         const handleUpdate = (data: any) => {
           if (data.room) {
-            setRoom(data.room);
-            setLastPlayAnim(true);
-            setTimeout(() => setLastPlayAnim(false), 500);
+            setRoom(prev => mergeRoom(prev, data.room));
           }
         };
 
         roomChannel.bind('room-updated', handleUpdate);
-        roomChannel.bind('game-started', handleUpdate);
+        roomChannel.bind('game-started', (data: any) => {
+          // game-started on room channel has hidden hands — fetch our real hand immediately
+          fetchRoom();
+        });
         roomChannel.bind('player-played', handleUpdate);
         roomChannel.bind('player-passed', handleUpdate);
         roomChannel.bind('player-joined', handleUpdate);
@@ -599,7 +604,11 @@ export default function GameRoom({ roomId }: GameRoomProps) {
               {selectedCards.length > 0 && (
                 <span style={{ marginLeft: 12, color: currentPlay ? (canPlaySelected ? '#2ecc71' : '#e67e22') : '#e74c3c' }}>
                   {selectedCards.length} lá chọn
-                  {currentPlay ? ` - ${currentPlay.type}` : ' - Không hợp lệ'}
+                  {currentPlay ? ` - ${{
+                    single: 'Đơn', pair: 'Đôi', triple: 'Ba cây', four: 'Tứ quý',
+                    sequence: 'Sảnh', pair_sequence: 'Đôi thông',
+                    triple_with_pair: 'Cù lũ', four_with_pair: 'Tứ quý đôi',
+                  }[currentPlay.type] || currentPlay.type}` : ' - Không hợp lệ'}
                 </span>
               )}
             </div>
