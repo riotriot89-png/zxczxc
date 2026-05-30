@@ -129,7 +129,7 @@ export default function AuthPage() {
                 marginBottom: -1,
               }}
             >
-              {m === 'login' ? 'Dang Nhap' : 'Tao Tai Khoan'}
+              {m === 'login' ? 'Đăng Nhập' : 'Tạo Tài Khoản'}
             </button>
           ))}
         </div>
@@ -137,14 +137,14 @@ export default function AuthPage() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', color: 'rgba(245,240,232,0.6)', fontSize: 13, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
-              Ten dang nhap
+              Tên đăng nhập
             </label>
             <input
               className="input-field"
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="Nhap ten cua ban"
+              placeholder="Nhập tên của bạn"
               autoComplete="username"
               required
             />
@@ -152,14 +152,14 @@ export default function AuthPage() {
 
           <div style={{ marginBottom: 24 }}>
             <label style={{ display: 'block', color: 'rgba(245,240,232,0.6)', fontSize: 13, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
-              Mat khau
+              Mật khẩu
             </label>
             <input
               className="input-field"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={mode === 'register' ? 'It nhat 6 ky tu' : 'Nhap mat khau'}
+              placeholder={mode === 'register' ? 'Ít nhất 6 ký tự' : 'Nhập mật khẩu'}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               required
             />
@@ -185,7 +185,7 @@ export default function AuthPage() {
             disabled={loading}
             style={{ width: '100%', fontSize: 16, padding: '13px' }}
           >
-            {loading ? 'Dang xu ly...' : mode === 'login' ? 'Dang Nhap' : 'Tao Tai Khoan'}
+            {loading ? 'Đang xử lý...' : mode === 'login' ? 'Đăng Nhập' : 'Tạo Tài Khoản'}
           </button>
         </form>
       </div>
