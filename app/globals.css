@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap');
+
+:root {
+  --felt: #1a5c2a;
+  --felt-dark: #0f3d1c;
+  --felt-light: #236b35;
+  --gold: #c9952a;
+  --gold-light: #e8b84b;
+  --red: #c0392b;
+  --red-dark: #922b21;
+  --black: #1a1a1a;
+  --cream: #f5f0e8;
+  --card-bg: #fefefe;
+  --card-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  --text-primary: #f5f0e8;
+  --text-muted: #a0b89a;
+  --border-gold: rgba(201,149,42,0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--felt-dark);
+  color: var(--text-primary);
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* Felt texture */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: 
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 3px; }
+
+/* Card base */
+.card-face {
+  background: var(--card-bg);
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.card-face:hover {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+
+.card-face.selected {
+  transform: translateY(-16px);
+  box-shadow: 0 12px 40px rgba(201,149,42,0.6), 0 0 0 2px var(--gold);
+}
+
+.card-face.red-suit { color: var(--red); }
+.card-face.black-suit { color: #1a1a1a; }
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold), var(--gold-light));
+  color: #1a1a1a;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(201,149,42,0.4);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  box-shadow: 0 4px 16px rgba(201,149,42,0.5);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--red-dark), var(--red));
+  color: white;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  font-family: 'Crimson Pro', serif;
+  border-radius: 6px;
+  padding: 9px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(201,149,42,0.1);
+}
+
+/* Input */
+.input-field {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-gold);
+  color: var(--cream);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'Crimson Pro', serif;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.input-field:focus {
+  border-color: var(--gold);
+  background: rgba(255,255,255,0.08);
+}
+
+.input-field::placeholder { color: rgba(245,240,232,0.35); }
+
+/* Panel */
+.panel {
+  background: rgba(15,61,28,0.8);
+  border: 1px solid var(--border-gold);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+/* Animations */
+@keyframes dealCard {
+  from { transform: translateY(-40px) scale(0.8); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes cardPlay {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.animate-deal { animation: dealCard 0.3s ease forwards; }
+.animate-fade { animation: fadeIn 0.4s ease forwards; }
