@@ -65,30 +65,19 @@ export function identifyPlay(cards: Card[]): Play | null {
     return null;
   }
 
-  if (cards.length === 3) {
-    if (sorted[0].rank === sorted[1].rank && sorted[1].rank === sorted[2].rank) {
+  // For 3+ cards, check all possible combinations (order matters: specific before general)
+  if (cards.length >= 3) {
+    // Triple (3 of same rank)
+    if (cards.length === 3 && sorted[0].rank === sorted[1].rank && sorted[1].rank === sorted[2].rank) {
       return { cards: sorted, type: 'triple', value: cardValue(sorted[2]) };
     }
-    return null;
-  }
 
-  if (cards.length === 4) {
-    if (sorted[0].rank === sorted[1].rank && sorted[1].rank === sorted[2].rank && sorted[2].rank === sorted[3].rank) {
+    // Four of a kind
+    if (cards.length === 4 &&
+      sorted[0].rank === sorted[1].rank &&
+      sorted[1].rank === sorted[2].rank &&
+      sorted[2].rank === sorted[3].rank) {
       return { cards: sorted, type: 'four', value: cardValue(sorted[3]) };
-    }
-    return null;
-  }
-
-  // Sequences: 3+ consecutive ranks, no 2s
-  if (cards.length >= 3) {
-    // Check if it's a sequence (straight)
-    if (isSequence(sorted)) {
-      return { cards: sorted, type: 'sequence', value: cardValue(sorted[sorted.length - 1]) };
-    }
-
-    // Pair sequence (double sequence): 6, 8, 10, 12 cards
-    if (cards.length >= 6 && cards.length % 2 === 0 && isPairSequence(sorted)) {
-      return { cards: sorted, type: 'pair_sequence', value: cardValue(sorted[sorted.length - 1]) };
     }
 
     // Triple with pair (5 cards)
@@ -97,10 +86,20 @@ export function identifyPlay(cards: Card[]): Play | null {
       if (tripleWithPair) return { cards: sorted, type: 'triple_with_pair', value: tripleWithPair };
     }
 
-    // Four with pair (6 cards)
+    // Four with pair (6 cards) — check before pair_sequence
     if (cards.length === 6) {
       const fourWithPair = isFourWithPair(sorted);
       if (fourWithPair !== null) return { cards: sorted, type: 'four_with_pair', value: fourWithPair };
+    }
+
+    // Sequence (sảnh): 3+ consecutive ranks, no 2s
+    if (isSequence(sorted)) {
+      return { cards: sorted, type: 'sequence', value: cardValue(sorted[sorted.length - 1]) };
+    }
+
+    // Pair sequence (đôi thông): 6, 8, 10, 12 cards
+    if (cards.length >= 6 && cards.length % 2 === 0 && isPairSequence(sorted)) {
+      return { cards: sorted, type: 'pair_sequence', value: cardValue(sorted[sorted.length - 1]) };
     }
   }
 
