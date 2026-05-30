@@ -20,6 +20,8 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const [actionError, setActionError] = useState('');
   const [chatMsg, setChatMsg] = useState('');
   const [lastPlayAnim, setLastPlayAnim] = useState(false);
+  const [flyingCards, setFlyingCards] = useState<string[]>([]);
+  const [landingPlay, setLandingPlay] = useState<Play | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pusherRef = useRef<any>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,10 +123,22 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const playCards = async () => {
     if (selectedCards.length === 0) return;
     setActionError('');
+    // 1. Trigger fly-out animation on selected cards
+    setFlyingCards(selectedCards);
+    // 2. After fly-out (320ms), optimistically remove from hand & show landing
+    setTimeout(() => {
+      const play = identifyPlay(myHand.filter(c => selectedCards.includes(c.id)));
+      if (play) setLandingPlay(play);
+      setFlyingCards([]);
+      // Clear landing animation after it completes
+      setTimeout(() => setLandingPlay(null), 400);
+    }, 280);
     try {
       await api('play', { cardIds: selectedCards });
       setSelectedCards([]);
     } catch (err: any) {
+      setFlyingCards([]);
+      setLandingPlay(null);
       setActionError(err.message);
     }
   };
@@ -230,7 +244,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {room.status === 'playing' && (
             <span style={{ fontSize: 13, color: 'rgba(245,240,232,0.5)' }}>
-              Lượt {room.turn} — {isMyTurn ? <span style={{ color: '#2ecc71', fontWeight: 600 }}>Lượt bạn</span> : <span>Chờ {room.players[room.currentPlayerIndex]?.username}...</span>}
+              Lượt {room.turn} — {isMyTurn ? <span className="turn-pulse" style={{ color: '#2ecc71', fontWeight: 600, borderRadius: 4, padding: '2px 6px' }}>Lượt bạn</span> : <span>Chờ {room.players[room.currentPlayerIndex]?.username}...</span>}
             </span>
           )}
           <span style={{ fontSize: 12, color: 'rgba(245,240,232,0.3)' }}>{user?.username}</span>
@@ -320,16 +334,24 @@ export default function GameRoom({ roomId }: GameRoomProps) {
             alignItems: 'center',
             gap: 12,
           }}>
-            {room.lastPlay && room.lastPlay.cards.length > 0 ? (
-              <div style={{ animation: lastPlayAnim ? 'cardPlay 0.4s ease' : 'none' }}>
+            {(landingPlay || (room.lastPlay && room.lastPlay.cards.length > 0)) ? (
+              <div>
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                  {room.lastPlay.cards.map((card: Card) => (
-                    <CardComponent key={card.id} card={card} size="md" />
+                  {(landingPlay || room.lastPlay)!.cards.map((card: Card, i: number) => (
+                    <div
+                      key={card.id + (landingPlay ? '-land' : '')}
+                      className={landingPlay ? 'card-land' : ''}
+                      style={{ '--land-rotate': `${(i % 2 === 0 ? -1 : 1) * (1 + i * 0.5)}deg` } as React.CSSProperties}
+                    >
+                      <CardComponent card={card} size="md" />
+                    </div>
                   ))}
                 </div>
-                <div style={{ textAlign: 'center', marginTop: 8, color: 'rgba(245,240,232,0.45)', fontSize: 12 }}>
-                  {room.players.find(p => p.id === room.lastPlayerId)?.username} vừa đánh
-                </div>
+                {!landingPlay && (
+                  <div style={{ textAlign: 'center', marginTop: 8, color: 'rgba(245,240,232,0.45)', fontSize: 12 }}>
+                    {room.players.find(p => p.id === room.lastPlayerId)?.username} vừa đánh
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ textAlign: 'center', color: 'rgba(245,240,232,0.2)', fontSize: 14 }}>
@@ -574,18 +596,30 @@ export default function GameRoom({ roomId }: GameRoomProps) {
               position: 'relative',
               minWidth: 'fit-content',
             }}>
-              {myHand.map((card: Card, idx: number) => (
-                <div key={card.id} style={{ marginLeft: idx > 0 ? -28 : 0, position: 'relative', zIndex: selectedCards.includes(card.id) ? 50 : idx }}>
-                  <CardComponent
-                    card={card}
-                    selected={selectedCards.includes(card.id)}
-                    onClick={() => isMyTurn ? toggleCard(card.id) : undefined}
-                    size="lg"
-                    disabled={!isMyTurn}
-                    style={{ animationDelay: `${idx * 30}ms` }}
-                  />
-                </div>
-              ))}
+              {myHand.map((card: Card, idx: number) => {
+                const isFlying = flyingCards.includes(card.id);
+                const isSelected = selectedCards.includes(card.id);
+                return (
+                  <div
+                    key={card.id}
+                    className={isFlying ? 'card-fly-out' : ''}
+                    style={{
+                      marginLeft: idx > 0 ? -28 : 0,
+                      position: 'relative',
+                      zIndex: isFlying ? 100 : isSelected ? 50 : idx,
+                      transition: 'margin 0.2s ease',
+                    }}
+                  >
+                    <CardComponent
+                      card={card}
+                      selected={isSelected && !isFlying}
+                      onClick={() => isMyTurn && !isFlying ? toggleCard(card.id) : undefined}
+                      size="lg"
+                      disabled={!isMyTurn || isFlying}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
