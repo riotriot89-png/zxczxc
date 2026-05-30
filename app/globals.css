@@ -189,3 +189,38 @@ body::before {
 
 .animate-deal { animation: dealCard 0.3s ease forwards; }
 .animate-fade { animation: fadeIn 0.4s ease forwards; }
+
+/* === SMOOTH CARD ANIMATIONS === */
+
+/* Card flies from hand up toward center */
+@keyframes cardFlyOut {
+  0%   { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+  60%  { transform: translateY(-180px) scale(1.15) rotate(-4deg); opacity: 1; }
+  100% { transform: translateY(-260px) scale(0.95) rotate(0deg); opacity: 0; }
+}
+
+/* New cards land on center table */
+@keyframes cardLand {
+  0%   { transform: translateY(60px) scale(0.75) rotate(var(--land-rotate, -6deg)); opacity: 0; }
+  65%  { transform: translateY(-6px) scale(1.06) rotate(calc(var(--land-rotate, -6deg) * 0.3)); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* Pulse when it's your turn */
+@keyframes turnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46,204,113,0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(46,204,113,0); }
+}
+
+/* Pass indicator fade */
+@keyframes passFade {
+  0%   { opacity: 0; transform: translateY(-10px) scale(0.9); }
+  30%  { opacity: 1; transform: translateY(0) scale(1); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px) scale(0.95); }
+}
+
+.card-land    { animation: cardLand 0.38s cubic-bezier(0.22,1,0.36,1) forwards; }
+.card-fly-out { animation: cardFlyOut 0.32s ease-in forwards; pointer-events: none; }
+.turn-pulse   { animation: turnPulse 1.6s ease-in-out infinite; }
+.pass-label   { animation: passFade 1.2s ease forwards; }
