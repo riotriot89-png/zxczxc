@@ -187,8 +187,8 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const isMyTurn = room.status === 'playing' && room.players[room.currentPlayerIndex]?.id === user?.id;
   const isHost = room.hostId === user?.id;
 
-  // Validate current selection
-  const myHand = me?.hand || [];
+  // Validate current selection — filter out hidden cards (other players' masked cards)
+  const myHand = (me?.hand || []).filter((c: Card) => c.id !== 'hidden');
   const selectedCardObjs = myHand.filter((c: Card) => selectedCards.includes(c.id));
   const currentPlay = selectedCardObjs.length > 0 ? identifyPlay(selectedCardObjs) : null;
   const canPlaySelected = currentPlay && (!room.lastPlay || !room.lastPlayerId || room.lastPlayerId === user?.id || canBeat(currentPlay, room.lastPlay));
@@ -510,7 +510,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       </div>
 
       {/* My hand - bottom */}
-      {room.status === 'playing' && me && me.hand.length > 0 && (
+      {room.status === 'playing' && me && myHand.length > 0 && (
         <div style={{
           background: 'rgba(6,15,9,0.7)',
           borderTop: '1px solid rgba(201,149,42,0.2)',
@@ -521,7 +521,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
           {/* Selection info */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 13, color: 'rgba(245,240,232,0.45)' }}>
-              Bài của bạn ({me.hand.length} lá)
+              Bài của bạn ({myHand.length} lá)
               {selectedCards.length > 0 && (
                 <span style={{ marginLeft: 12, color: currentPlay ? (canPlaySelected ? '#2ecc71' : '#e67e22') : '#e74c3c' }}>
                   {selectedCards.length} lá chọn
@@ -574,7 +574,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
               position: 'relative',
               minWidth: 'fit-content',
             }}>
-              {me.hand.map((card: Card, idx: number) => (
+              {myHand.map((card: Card, idx: number) => (
                 <div key={card.id} style={{ marginLeft: idx > 0 ? -28 : 0, position: 'relative', zIndex: selectedCards.includes(card.id) ? 50 : idx }}>
                   <CardComponent
                     card={card}
