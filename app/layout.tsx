@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Tien Len - Danh Bai Online',
-  description: 'Choi Tien Len Mien Nam online cung ban be',
+  title: 'Tiến Lên - Đánh Bài Online',
+  description: 'Tiến Lên Miền Nam',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
