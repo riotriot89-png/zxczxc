@@ -170,15 +170,15 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a2e12' }}>
-      <div style={{ color: '#c9952a', fontFamily: 'Playfair Display, serif', fontSize: 22 }}>Dang tai...</div>
+      <div style={{ color: '#c9952a', fontFamily: 'Playfair Display, serif', fontSize: 22 }}>Đang tải...</div>
     </div>
   );
 
   if (!room) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a2e12' }}>
       <div>
-        <p style={{ color: '#e74c3c', marginBottom: 16 }}>Phong khong ton tai</p>
-        <button className="btn-primary" onClick={() => router.push('/')}>Quay Ve</button>
+        <p style={{ color: '#e74c3c', marginBottom: 16 }}>Phòng không tồn tại</p>
+        <button className="btn-primary" onClick={() => router.push('/')}>Quay Về</button>
       </div>
     </div>
   );
@@ -220,7 +220,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
           <button onClick={leaveRoom} style={{ background: 'none', border: 'none', color: 'rgba(245,240,232,0.45)', cursor: 'pointer', fontSize: 13, transition: 'color 0.2s' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#c9952a')}
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(245,240,232,0.45)')}>
-            Roi Phong
+            Rời Phòng
           </button>
           <span style={{ color: 'rgba(245,240,232,0.3)' }}>|</span>
           <span style={{ fontFamily: 'Playfair Display, serif', color: '#c9952a', fontWeight: 700 }}>{room.name}</span>
@@ -230,7 +230,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {room.status === 'playing' && (
             <span style={{ fontSize: 13, color: 'rgba(245,240,232,0.5)' }}>
-              Luot {room.turn} - {isMyTurn ? <span style={{ color: '#2ecc71', fontWeight: 600 }}>Luot ban</span> : <span>Cho {room.players[room.currentPlayerIndex]?.username}...</span>}
+              Lượt {room.turn} — {isMyTurn ? <span style={{ color: '#2ecc71', fontWeight: 600 }}>Lượt bạn</span> : <span>Chờ {room.players[room.currentPlayerIndex]?.username}...</span>}
             </span>
           )}
           <span style={{ fontSize: 12, color: 'rgba(245,240,232,0.3)' }}>{user?.username}</span>
@@ -285,7 +285,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                 }}>
                   {isTurn && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2ecc71', animation: 'none' }} />}
                   <span style={{ fontWeight: 600, color: '#f5f0e8', fontSize: 13 }}>{player.username}</span>
-                  <span style={{ color: 'rgba(245,240,232,0.4)', fontSize: 12 }}>{player.hand.length} la</span>
+                  <span style={{ color: 'rgba(245,240,232,0.4)', fontSize: 12 }}>{player.hand.length} lá</span>
                   {player.finishPosition && (
                     <span style={{ background: '#c9952a', color: '#1a1a1a', padding: '1px 6px', borderRadius: 3, fontSize: 11, fontWeight: 700 }}>
                       #{player.finishPosition}
@@ -328,12 +328,12 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                   ))}
                 </div>
                 <div style={{ textAlign: 'center', marginTop: 8, color: 'rgba(245,240,232,0.45)', fontSize: 12 }}>
-                  {room.players.find(p => p.id === room.lastPlayerId)?.username} vua danh
+                  {room.players.find(p => p.id === room.lastPlayerId)?.username} vừa đánh
                 </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center', color: 'rgba(245,240,232,0.2)', fontSize: 14 }}>
-                {room.status === 'waiting' ? 'Cho nguoi choi...' : room.status === 'playing' ? 'Danh bai dau tien' : ''}
+                {room.status === 'waiting' ? 'Chờ người chơi...' : room.status === 'playing' ? 'Đánh bài đầu tiên' : ''}
               </div>
             )}
           </div>
@@ -354,10 +354,10 @@ export default function GameRoom({ roomId }: GameRoomProps) {
               minWidth: 300,
             }}>
               <p style={{ color: '#c9952a', fontFamily: 'Playfair Display, serif', fontSize: 18, marginBottom: 16 }}>
-                Phong {room.name}
+                Phòng {room.name}
               </p>
               <p style={{ color: 'rgba(245,240,232,0.5)', fontSize: 14, marginBottom: 20 }}>
-                {room.players.length}/{room.maxPlayers} nguoi choi
+                {room.players.length}/{room.maxPlayers} người chơi
               </p>
 
               {/* Players list */}
@@ -373,10 +373,10 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                   }}>
                     <span style={{ color: '#f5f0e8', fontSize: 14 }}>
                       {p.username}
-                      {p.id === room.hostId && <span style={{ marginLeft: 6, fontSize: 11, color: '#c9952a' }}>Chu phong</span>}
+                      {p.id === room.hostId && <span style={{ marginLeft: 6, fontSize: 11, color: '#c9952a' }}>Chủ phòng</span>}
                     </span>
                     <span style={{ fontSize: 12, color: p.isReady ? '#2ecc71' : 'rgba(245,240,232,0.3)' }}>
-                      {p.id === user?.id ? (p.isReady ? 'San sang' : 'Chua san sang') : (p.isReady ? 'San sang' : 'Cho...')}
+                      {p.id === user?.id ? (p.isReady ? 'Sẵn sàng' : 'Chưa sẵn sàng') : (p.isReady ? 'Sẵn sàng' : 'Chờ...')}
                     </span>
                   </div>
                 ))}
@@ -385,7 +385,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                 {me && (
                   <button className="btn-secondary" onClick={toggleReady} style={{ fontSize: 14 }}>
-                    {me.isReady ? 'Huy San Sang' : 'San sang'}
+                    {me.isReady ? 'Huỷ sẵn sàng' : 'Sẵn sàng'}
                   </button>
                 )}
                 {isHost && (
@@ -395,7 +395,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                     disabled={room.players.length < 2}
                     style={{ fontSize: 14 }}
                   >
-                    Bat Dau
+                    Bắt Đầu
                   </button>
                 )}
               </div>
@@ -422,7 +422,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                 boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
               }}>
                 <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 30, color: '#c9952a', marginBottom: 24 }}>
-                  Ket Qua
+                  Kết Quả
                 </h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
                   {[...room.players].sort((a, b) => (a.finishPosition || 99) - (b.finishPosition || 99)).map(p => (
@@ -439,15 +439,15 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                         #{p.finishPosition || '?'}
                       </span>
                       <span style={{ fontWeight: 600, color: '#f5f0e8', fontSize: 16 }}>{p.username}</span>
-                      {p.finishPosition === 1 && <span style={{ color: '#c9952a', fontSize: 14 }}>Thang!</span>}
+                      {p.finishPosition === 1 && <span style={{ color: '#c9952a', fontSize: 14 }}>Thắng! 🏆</span>}
                     </div>
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                   {isHost && (
-                    <button className="btn-primary" onClick={startGame}>Choi Lai</button>
+                    <button className="btn-primary" onClick={startGame}>Chơi Lại</button>
                   )}
-                  <button className="btn-secondary" onClick={leaveRoom}>Roi Phong</button>
+                  <button className="btn-secondary" onClick={leaveRoom}>Rời Phòng</button>
                 </div>
               </div>
             </div>
@@ -465,7 +465,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(201,149,42,0.15)' }}>
             <span style={{ color: 'rgba(245,240,232,0.5)', fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' }}>
-              Tin nhan
+              Tin nhắn
             </span>
           </div>
 
@@ -483,7 +483,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
             <input
               value={chatMsg}
               onChange={e => setChatMsg(e.target.value)}
-              placeholder="Nhan tin..."
+              placeholder="Nhắn tin..."
               style={{
                 flex: 1,
                 background: 'rgba(255,255,255,0.05)',
@@ -504,7 +504,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
               padding: '6px 10px',
               cursor: 'pointer',
               fontSize: 13,
-            }}>Gui</button>
+            }}>Gửi</button>
           </form>
         </div>
       </div>
@@ -521,11 +521,11 @@ export default function GameRoom({ roomId }: GameRoomProps) {
           {/* Selection info */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 13, color: 'rgba(245,240,232,0.45)' }}>
-              Bai cua ban ({me.hand.length} la)
+              Bài của bạn ({me.hand.length} lá)
               {selectedCards.length > 0 && (
                 <span style={{ marginLeft: 12, color: currentPlay ? (canPlaySelected ? '#2ecc71' : '#e67e22') : '#e74c3c' }}>
-                  {selectedCards.length} la chon
-                  {currentPlay ? ` - ${currentPlay.type}` : ' - Khong hop le'}
+                  {selectedCards.length} lá chọn
+                  {currentPlay ? ` - ${currentPlay.type}` : ' - Không hợp lệ'}
                 </span>
               )}
             </div>
@@ -541,7 +541,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                   disabled={!room.lastPlay || room.lastPlayerId === user?.id}
                   style={{ fontSize: 13, padding: '6px 16px' }}
                 >
-                  Bo Qua
+                  Bỏ Qua
                 </button>
                 <button
                   className="btn-primary"
@@ -549,13 +549,13 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                   disabled={!currentPlay || !canPlaySelected || !isMyTurn}
                   style={{ fontSize: 14, padding: '8px 20px' }}
                 >
-                  Danh Bai
+                  Đánh Bài
                 </button>
               </div>
             )}
             {!isMyTurn && room.status === 'playing' && (
               <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 13 }}>
-                Cho den luot ban...
+                Chờ đến lượt bạn...
               </span>
             )}
           </div>
@@ -563,21 +563,30 @@ export default function GameRoom({ roomId }: GameRoomProps) {
           {/* Hand */}
           <div style={{
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: 6,
+            overflowX: 'auto',
+            overflowY: 'visible',
+            paddingBottom: 20,
+            paddingTop: 20,
             justifyContent: 'center',
           }}>
-            {me.hand.map((card: Card, idx: number) => (
-              <CardComponent
-                key={card.id}
-                card={card}
-                selected={selectedCards.includes(card.id)}
-                onClick={() => isMyTurn ? toggleCard(card.id) : undefined}
-                size="lg"
-                disabled={!isMyTurn}
-                style={{ animationDelay: `${idx * 30}ms` }}
-              />
-            ))}
+            <div style={{
+              display: 'flex',
+              position: 'relative',
+              minWidth: 'fit-content',
+            }}>
+              {me.hand.map((card: Card, idx: number) => (
+                <div key={card.id} style={{ marginLeft: idx > 0 ? -28 : 0, position: 'relative', zIndex: selectedCards.includes(card.id) ? 50 : idx }}>
+                  <CardComponent
+                    card={card}
+                    selected={selectedCards.includes(card.id)}
+                    onClick={() => isMyTurn ? toggleCard(card.id) : undefined}
+                    size="lg"
+                    disabled={!isMyTurn}
+                    style={{ animationDelay: `${idx * 30}ms` }}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
