@@ -79,9 +79,9 @@ export default function Lobby() {
   };
 
   const statusLabel = (s: string) => {
-    if (s === 'waiting') return { text: 'Cho nguoi', color: '#2ecc71' };
-    if (s === 'playing') return { text: 'Dang choi', color: '#e67e22' };
-    return { text: 'Ket thuc', color: '#95a5a6' };
+    if (s === 'waiting') return { text: 'Chờ người', color: '#2ecc71' };
+    if (s === 'playing') return { text: 'Đang chơi', color: '#e67e22' };
+    return { text: 'Kết thúc', color: '#95a5a6' };
   };
 
   return (
@@ -114,7 +114,7 @@ export default function Lobby() {
             </div>
           </div>
           <button className="btn-secondary" onClick={logout} style={{ padding: '6px 16px', fontSize: 14 }}>
-            Dang Xuat
+            Đăng Xuất
           </button>
         </div>
       </div>
@@ -123,11 +123,11 @@ export default function Lobby() {
         {/* Actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 22, color: 'rgba(245,240,232,0.8)' }}>
-            Danh Sach Phong  <span style={{ fontSize: 14, color: 'rgba(245,240,232,0.35)', fontFamily: 'Crimson Pro' }}>({rooms.length} phong)</span>
+            Danh Sách Phòng  <span style={{ fontSize: 14, color: 'rgba(245,240,232,0.35)', fontFamily: 'Crimson Pro' }}>({rooms.length} phòng)</span>
           </h2>
           <div style={{ display: 'flex', gap: 12 }}>
             <button className="btn-secondary" onClick={fetchRooms} style={{ fontSize: 14 }}>Lam Moi</button>
-            <button className="btn-primary" onClick={() => setShowCreate(true)}>Tao Phong</button>
+            <button className="btn-primary" onClick={() => setShowCreate(true)}>Tạo Phòng</button>
           </div>
         </div>
 
@@ -143,8 +143,8 @@ export default function Lobby() {
             color: 'rgba(245,240,232,0.35)',
           }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>♠</div>
-            <p style={{ fontSize: 18 }}>Chua co phong nao</p>
-            <p style={{ fontSize: 14, marginTop: 8 }}>Hay tao phong va moi ban be vao choi</p>
+            <p style={{ fontSize: 18 }}>Chưa có phòng nào</p>
+            <p style={{ fontSize: 14, marginTop: 8 }}>Hãy tạo phòng và mời bạn bè vào chơi</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -179,13 +179,13 @@ export default function Lobby() {
                         {room.name}
                       </span>
                       {room.hasPassword && (
-                        <span style={{ fontSize: 12, color: '#c9952a', opacity: 0.7 }}>Co mat khau</span>
+                        <span style={{ fontSize: 12, color: '#c9952a', opacity: 0.7 }}>Có mật khẩu</span>
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 16, fontSize: 13, color: 'rgba(245,240,232,0.45)' }}>
-                      <span>Phong: <strong style={{ color: '#c9952a', fontFamily: 'monospace', fontSize: 15 }}>#{room.id}</strong></span>
+                      <span>Phòng: <strong style={{ color: '#c9952a', fontFamily: 'monospace', fontSize: 15 }}>#{room.id}</strong></span>
                       <span style={{ color: st.color }}>{st.text}</span>
-                      <span>{room.playerCount}/{room.maxPlayers} nguoi</span>
+                      <span>{room.playerCount}/{room.maxPlayers} người</span>
                     </div>
                   </div>
 
@@ -203,11 +203,11 @@ export default function Lobby() {
                       }}
                       style={{ fontSize: 14 }}
                     >
-                      Vao Phong
+                      Vào Phòng
                     </button>
                   )}
                   {room.status === 'waiting' && room.playerCount >= room.maxPlayers && (
-                    <span style={{ color: 'rgba(245,240,232,0.35)', fontSize: 13 }}>Day phong</span>
+                    <span style={{ color: 'rgba(245,240,232,0.35)', fontSize: 13 }}>Đầy phòng</span>
                   )}
                   {room.status === 'playing' && (
                     <button
@@ -250,39 +250,39 @@ export default function Lobby() {
             onClick={e => e.stopPropagation()}
           >
             <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: 22, color: '#c9952a', marginBottom: 28 }}>
-              Tao Phong Moi
+              Tạo Phòng Moi
             </h3>
 
             <form onSubmit={createRoom}>
               <div style={{ marginBottom: 18 }}>
                 <label style={{ display: 'block', color: 'rgba(245,240,232,0.55)', fontSize: 12, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
-                  Ten phong
+                  Tên phòng
                 </label>
                 <input
                   className="input-field"
                   value={createForm.name}
                   onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="VD: Phong cua Tien"
+                  placeholder="VD: Phòng của Tiến"
                   required
                 />
               </div>
 
               <div style={{ marginBottom: 18 }}>
                 <label style={{ display: 'block', color: 'rgba(245,240,232,0.55)', fontSize: 12, marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>
-                  Mat khau phong (tuy chon)
+                  Mật khẩu phòng (tuỳ chọn)
                 </label>
                 <input
                   className="input-field"
                   value={createForm.password}
                   onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
-                  placeholder="De trong neu khong can mat khau"
+                  placeholder="Để trống nếu không cần mật khẩu"
                   type="password"
                 />
               </div>
 
               <div style={{ marginBottom: 28 }}>
                 <label style={{ display: 'block', color: 'rgba(245,240,232,0.55)', fontSize: 12, marginBottom: 10, letterSpacing: 1, textTransform: 'uppercase' }}>
-                  So nguoi choi: {createForm.maxPlayers}
+                  Số người chơi: {createForm.maxPlayers}
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {[2, 3, 4].map(n => (
@@ -319,7 +319,7 @@ export default function Lobby() {
               <div style={{ display: 'flex', gap: 12 }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowCreate(false)} style={{ flex: 1 }}>Huy</button>
                 <button type="submit" className="btn-primary" disabled={creating} style={{ flex: 2, fontSize: 15 }}>
-                  {creating ? 'Dang tao...' : 'Tao Phong'}
+                  {creating ? 'Đang tạo...' : 'Tạo Phòng'}
                 </button>
               </div>
             </form>
@@ -351,10 +351,10 @@ export default function Lobby() {
             onClick={e => e.stopPropagation()}
           >
             <h3 style={{ fontFamily: 'Playfair Display, serif', fontSize: 20, color: '#c9952a', marginBottom: 8 }}>
-              Nhap Mat Khau
+              Nhập Mật Khẩu
             </h3>
             <p style={{ color: 'rgba(245,240,232,0.45)', fontSize: 14, marginBottom: 24 }}>
-              Phong "{showJoin.name}" yeu cau mat khau
+              Phòng "{showJoin.name}" yêu cầu mật khẩu
             </p>
 
             <input
@@ -362,7 +362,7 @@ export default function Lobby() {
               type="password"
               value={joinPassword}
               onChange={e => setJoinPassword(e.target.value)}
-              placeholder="Mat khau phong"
+              placeholder="Mật khẩu phòng"
               onKeyDown={e => { if (e.key === 'Enter') joinRoom(showJoin, joinPassword); }}
               autoFocus
               style={{ marginBottom: 16 }}
