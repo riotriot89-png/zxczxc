@@ -36,12 +36,24 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       const data = await res.json();
       // Only hard-replace if turn/status actually advanced (avoid stomping optimistic state)
       setRoom(prev => {
-        if (!prev) return data.room;
         const next = data.room;
-        // If server is ahead (new turn or status change), accept server state
-        if (next.turn > prev.turn || next.status !== prev.status) return next;
-        // Otherwise keep current state (optimistic updates are more current)
-        return prev;
+        if (!prev) return next;
+        // Merge server state but preserve our own real hand if server sent hidden cards
+        // (can happen with race between poll and optimistic update)
+        const merged = {
+          ...next,
+          players: next.players.map((serverPlayer: any) => {
+            const localPlayer = prev.players.find((p: any) => p.id === serverPlayer.id);
+            const serverHandIsHidden = serverPlayer.hand.every((c: any) => c.id === 'hidden');
+            const localHasRealCards = localPlayer?.hand.some((c: any) => c.id !== 'hidden');
+            // Keep local hand if server masked it but we have real cards locally
+            if (serverHandIsHidden && localHasRealCards) {
+              return { ...serverPlayer, hand: localPlayer!.hand };
+            }
+            return serverPlayer;
+          }),
+        };
+        return merged;
       });
     } catch {}
     setLoading(false);
