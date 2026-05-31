@@ -37,16 +37,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Sai mật khẩu phòng' }, { status: 403 });
   }
 
-  if (room.players.length >= room.maxPlayers) {
-    return NextResponse.json({ error: 'Phòng đã đầy' }, { status: 400 });
-  }
+  // Check if already in room — if so, always allow (reconnect/refresh scenario)
+  const alreadyIn = room.players.find(p => p.id === authUser.id);
 
-  if (room.status !== 'waiting') {
+  if (room.status !== 'waiting' && !alreadyIn) {
     return NextResponse.json({ error: 'Ván đang diễn ra' }, { status: 400 });
   }
 
-  // Check if already in room
-  const alreadyIn = room.players.find(p => p.id === authUser.id);
+  if (!alreadyIn && room.players.length >= room.maxPlayers) {
+    return NextResponse.json({ error: 'Phòng đã đầy' }, { status: 400 });
+  }
+
   if (!alreadyIn) {
     room.players.push({
       id: authUser.id,
