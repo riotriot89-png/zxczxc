@@ -215,7 +215,7 @@ export default function Lobby() {
                       onClick={() => router.push(`/room/${room.id}`)}
                       style={{ fontSize: 14 }}
                     >
-                      Xem / Vào Lại
+                      Xem
                     </button>
                   )}
                 </div>
