@@ -25,48 +25,91 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pusherRef = useRef<any>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
+  const roomLoadedRef = useRef(false); // track if we ever successfully loaded
 
   const fetchRoom = useCallback(async () => {
-    if (!token) return;
+    if (!token || !mountedRef.current) return;
     try {
       const res = await fetch(`/api/rooms/${roomId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       if (!res.ok) {
-        // Only redirect if room truly doesn't exist AND we haven't loaded any room data yet
-        // (prevents kicking players out due to transient server errors mid-game)
-        if (res.status === 404) {
-          setRoom(prev => { if (!prev) router.push('/'); return prev; });
+        // Only redirect to home if: room truly doesn't exist (404) AND we never loaded it before
+        // This prevents transient server errors (serverless cold start etc.) from kicking users
+        if (res.status === 404 && !roomLoadedRef.current) {
+          router.push('/');
         }
+        // Otherwise: silently ignore errors, next poll will retry
         return;
       }
+
       const data = await res.json();
-      // Only hard-replace if turn/status actually advanced (avoid stomping optimistic state)
+      if (!mountedRef.current) return;
+
+      roomLoadedRef.current = true;
       setRoom(prev => {
         const next = data.room;
         if (!prev) return next;
-        // fetchRoom always returns our real hand (server sends it directly to us)
-        // so always accept — no merge needed here
+        // Always trust server for game state, but preserve our real hand
+        // if server sent hidden (e.g. from public channel update)
+        const myServerPlayer = next.players.find((p: any) => p.id === user?.id);
+        const myLocalPlayer = prev.players.find((p: any) => p.id === user?.id);
+        const serverHandHidden = myServerPlayer?.hand.every((c: any) => c.id === 'hidden');
+        const localHandReal = myLocalPlayer?.hand.some((c: any) => c.id !== 'hidden');
+        if (serverHandHidden && localHandReal) {
+          // Server returned hidden hand (public fetch) — preserve local real hand
+          return {
+            ...next,
+            players: next.players.map((p: any) => {
+              if (p.id === user?.id) return { ...p, hand: myLocalPlayer!.hand };
+              return p;
+            }),
+          };
+        }
         return next;
       });
-    } catch {}
+    } catch {
+      // Network error — silently ignore, poll will retry
+    }
     setLoading(false);
-  }, [token, roomId, router]);
+  }, [token, roomId, router, user?.id]);
 
-  // Setup Pusher for realtime
+  // On mount: join the room (handles reconnect after refresh/redirect)
+  useEffect(() => {
+    if (!token) return;
+    const joinThenFetch = async () => {
+      try {
+        // Attempt to join — server handles "already in room" gracefully
+        await fetch(`/api/rooms/${roomId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ password: '' }),
+        });
+      } catch {}
+      await fetchRoom();
+    };
+    joinThenFetch();
+  }, [token, roomId, fetchRoom]);
+
+  // Setup Pusher + polling
   useEffect(() => {
     if (!token || !user) return;
-    fetchRoom();
+    mountedRef.current = true;
 
-    // Poll as fallback (Pusher may not be configured)
-    // Poll fast initially to catch game-started transition, then slow down
-    let fastPollCount = 0;
-    const fastPoll = setInterval(() => {
+    // Poll interval: start fast (catch game-started quickly), then slow down
+    let fastPollsLeft = 10;
+    const doPoll = () => {
       fetchRoom();
-      fastPollCount++;
-      if (fastPollCount >= 6) clearInterval(fastPoll); // stop after 12s fast polling
-    }, 2000);
-    pollRef.current = setInterval(fetchRoom, 8000); // safety net only, optimistic updates handle UI
+      if (fastPollsLeft > 0) {
+        fastPollsLeft--;
+        pollRef.current = setTimeout(doPoll, 2000);
+      } else {
+        pollRef.current = setTimeout(doPoll, 6000);
+      }
+    };
+    pollRef.current = setTimeout(doPoll, 2000);
 
     // Try Pusher
     try {
@@ -75,7 +118,6 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       if (pusherKey && pusherKey !== 'demo') {
         const pusher = new PusherJS(pusherKey, {
           cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'ap1',
-          authEndpoint: '/api/pusher/auth',
         });
 
         const roomChannel = pusher.subscribe(`room-${roomId}`);
@@ -83,7 +125,6 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
         const mergeRoom = (prev: any, next: any) => {
           if (!prev) return next;
-          // Preserve our real hand if server sent hidden (public channel doesn't include hands)
           return {
             ...next,
             players: next.players.map((serverPlayer: any) => {
@@ -99,18 +140,18 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         };
 
         const handleUpdate = (data: any) => {
+          if (!mountedRef.current) return;
           if (data.room) {
             setRoom(prev => mergeRoom(prev, data.room));
           }
         };
 
         roomChannel.bind('room-updated', handleUpdate);
-        roomChannel.bind('game-started', (data: any) => {
-          // game-started on room channel has hidden hands — fetch our real hand immediately
-          // Retry a few times in case of transient server errors (serverless cold start etc.)
+        roomChannel.bind('game-started', () => {
+          // Public channel has hidden hands — fetch real hand (with retries)
           fetchRoom();
-          setTimeout(fetchRoom, 800);
-          setTimeout(fetchRoom, 2000);
+          setTimeout(fetchRoom, 1000);
+          setTimeout(fetchRoom, 2500);
         });
         roomChannel.bind('player-played', handleUpdate);
         roomChannel.bind('player-passed', handleUpdate);
@@ -118,24 +159,38 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         roomChannel.bind('player-left', handleUpdate);
         roomChannel.bind('player-ready', handleUpdate);
         roomChannel.bind('chat-message', (msg: any) => {
+          if (!mountedRef.current) return;
           setRoom(prev => prev ? { ...prev, chat: [...(prev.chat || []), msg] } : prev);
         });
 
+        // Player channel has real hands
         playerChannel.bind('game-started', handleUpdate);
         playerChannel.bind('player-played', handleUpdate);
         playerChannel.bind('player-passed', handleUpdate);
 
         pusherRef.current = pusher;
-        if (pollRef.current) clearInterval(pollRef.current);
-        pollRef.current = setInterval(fetchRoom, 10000); // very slow poll with pusher, events handle updates
+
+        // Slow down polling when Pusher is active
+        if (pollRef.current) clearTimeout(pollRef.current);
+        fastPollsLeft = 5; // still do a few fast polls at start
+        const doPollSlow = () => {
+          if (!mountedRef.current) return;
+          fetchRoom();
+          pollRef.current = setTimeout(doPollSlow, 8000);
+        };
+        pollRef.current = setTimeout(doPollSlow, 2000);
       }
     } catch {}
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      mountedRef.current = false;
+      if (pollRef.current) clearTimeout(pollRef.current);
       if (pusherRef.current) {
-        pusherRef.current.unsubscribe(`room-${roomId}`);
-        pusherRef.current.unsubscribe(`player-${user.id}`);
+        try {
+          pusherRef.current.unsubscribe(`room-${roomId}`);
+          pusherRef.current.unsubscribe(`player-${user.id}`);
+          pusherRef.current.disconnect();
+        } catch {}
       }
     };
   }, [token, user, roomId, fetchRoom]);
@@ -152,8 +207,6 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lỗi');
-    // Do NOT fetchRoom() here — Pusher events will update state smoothly.
-    // Fallback poll will sync if Pusher misses anything.
     return data;
   }, [token, roomId]);
 
@@ -168,17 +221,14 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     setActionError('');
     const cardsToPlay = [...selectedCards];
     const play = identifyPlay(myHand.filter((c: Card) => cardsToPlay.includes(c.id)));
-    if (!play) return;
+    if (!play) { setActionError('Tổ hợp bài không hợp lệ'); return; }
 
-    // Step 1: animate cards flying out
     setFlyingCards(cardsToPlay);
 
-    // Step 2: after fly-out, optimistically update local state
     setTimeout(() => {
       setFlyingCards([]);
       setSelectedCards([]);
       setLandingPlay(play);
-      // Optimistically remove played cards from hand & update lastPlay
       setRoom(prev => {
         if (!prev) return prev;
         return {
@@ -198,11 +248,10 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     try {
       await api('play', { cardIds: cardsToPlay });
     } catch (err: any) {
-      // Revert optimistic update on error
       setFlyingCards([]);
       setLandingPlay(null);
       setActionError(err.message);
-      fetchRoom(); // re-sync on error
+      fetchRoom();
     }
   };
 
@@ -218,11 +267,11 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   };
 
   const startGame = async () => {
+    setActionError('');
     try { await api('start'); } catch (err: any) { setActionError(err.message); }
   };
 
   const toggleReady = async () => {
-    // Optimistic: flip ready state locally
     setRoom(prev => {
       if (!prev) return prev;
       return {
@@ -238,21 +287,24 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const sendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMsg.trim()) return;
+    const msg = chatMsg;
+    setChatMsg('');
     try {
       await fetch(`/api/rooms/${roomId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: chatMsg }),
+        body: JSON.stringify({ message: msg }),
       });
-      setChatMsg('');
     } catch {}
   };
 
   const leaveRoom = async () => {
-    await fetch(`/api/rooms/${roomId}/leave`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    try {
+      await fetch(`/api/rooms/${roomId}/leave`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {}
     router.push('/');
   };
 
@@ -264,8 +316,8 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
   if (!room) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a2e12' }}>
-      <div>
-        <p style={{ color: '#e74c3c', marginBottom: 16 }}>Phòng không tồn tại</p>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ color: '#e74c3c', marginBottom: 16 }}>Không tìm thấy phòng</p>
         <button className="btn-primary" onClick={() => router.push('/')}>Quay Về</button>
       </div>
     </div>
@@ -275,19 +327,17 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const isMyTurn = room.status === 'playing' && room.players[room.currentPlayerIndex]?.id === user?.id;
   const isHost = room.hostId === user?.id;
 
-  // Validate current selection — filter out hidden cards (other players' masked cards)
   const myHand = (me?.hand || []).filter((c: Card) => c.id !== 'hidden');
   const selectedCardObjs = myHand.filter((c: Card) => selectedCards.includes(c.id));
   const currentPlay = selectedCardObjs.length > 0 ? identifyPlay(selectedCardObjs) : null;
   const canPlaySelected = currentPlay && (!room.lastPlay || !room.lastPlayerId || room.lastPlayerId === user?.id || canBeat(currentPlay, room.lastPlay));
 
-  // Player positions for up to 4 players
   const otherPlayers = room.players.filter(p => p.id !== user?.id);
 
   const positions = [
-    { top: '50%', left: 0, transform: 'translateY(-50%)' },  // left
-    { top: 0, left: '50%', transform: 'translateX(-50%)' },   // top
-    { top: '50%', right: 0, transform: 'translateY(-50%)' },  // right
+    { top: '50%', left: 0, transform: 'translateY(-50%)' },
+    { top: 0, left: '50%', transform: 'translateX(-50%)' },
+    { top: '50%', right: 0, transform: 'translateY(-50%)' },
   ];
 
   return (
@@ -318,7 +368,9 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {room.status === 'playing' && (
             <span style={{ fontSize: 13, color: 'rgba(245,240,232,0.5)' }}>
-              Lượt {room.turn} — {isMyTurn ? <span className="turn-pulse" style={{ color: '#2ecc71', fontWeight: 600, borderRadius: 4, padding: '2px 6px' }}>Lượt bạn</span> : <span>Chờ {room.players[room.currentPlayerIndex]?.username}...</span>}
+              Lượt {room.turn} — {isMyTurn
+                ? <span className="turn-pulse" style={{ color: '#2ecc71', fontWeight: 600, borderRadius: 4, padding: '2px 6px' }}>Lượt bạn</span>
+                : <span>Chờ {room.players[room.currentPlayerIndex]?.username}...</span>}
             </span>
           )}
           <span style={{ fontSize: 12, color: 'rgba(245,240,232,0.3)' }}>{user?.username}</span>
@@ -349,19 +401,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
             const pos = positions[idx % 3];
             const isTurn = room.status === 'playing' && room.players[room.currentPlayerIndex]?.id === player.id;
             return (
-              <div
-                key={player.id}
-                style={{
-                  position: 'absolute',
-                  ...pos,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: 16,
-                }}
-              >
-                {/* Name tag */}
+              <div key={player.id} style={{ position: 'absolute', ...pos, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 16 }}>
                 <div style={{
                   background: isTurn ? 'rgba(46,204,113,0.15)' : 'rgba(15,61,28,0.7)',
                   border: isTurn ? '1px solid #2ecc71' : '1px solid rgba(201,149,42,0.2)',
@@ -371,7 +411,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                   alignItems: 'center',
                   gap: 8,
                 }}>
-                  {isTurn && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2ecc71', animation: 'none' }} />}
+                  {isTurn && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2ecc71' }} />}
                   <span style={{ fontWeight: 600, color: '#f5f0e8', fontSize: 13 }}>{player.username}</span>
                   <span style={{ color: 'rgba(245,240,232,0.4)', fontSize: 12 }}>{player.hand.length} lá</span>
                   {player.finishPosition && (
@@ -380,16 +420,10 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                     </span>
                   )}
                 </div>
-
-                {/* Face-down cards */}
                 <div style={{ display: 'flex', gap: -8 }}>
                   {Array.from({ length: Math.min(player.hand.length, 13) }).map((_, i) => (
                     <div key={i} style={{ marginLeft: i > 0 ? -8 : 0 }}>
-                      <CardComponent
-                        card={{ id: 'hidden', suit: 'spades', rank: '3' }}
-                        faceDown
-                        size="sm"
-                      />
+                      <CardComponent card={{ id: 'hidden', suit: 'spades', rank: '3' }} faceDown size="sm" />
                     </div>
                   ))}
                 </div>
@@ -456,7 +490,6 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                 {room.players.length}/{room.maxPlayers} người chơi
               </p>
 
-              {/* Players list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
                 {room.players.map(p => (
                   <div key={p.id} style={{
@@ -472,11 +505,15 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                       {p.id === room.hostId && <span style={{ marginLeft: 6, fontSize: 11, color: '#c9952a' }}>Chủ phòng</span>}
                     </span>
                     <span style={{ fontSize: 12, color: p.isReady ? '#2ecc71' : 'rgba(245,240,232,0.3)' }}>
-                      {p.id === user?.id ? (p.isReady ? 'Sẵn sàng' : 'Chưa sẵn sàng') : (p.isReady ? 'Sẵn sàng' : 'Chờ...')}
+                      {p.isReady ? 'Sẵn sàng' : 'Chưa sẵn sàng'}
                     </span>
                   </div>
                 ))}
               </div>
+
+              {actionError && (
+                <div style={{ color: '#e74c3c', fontSize: 13, marginBottom: 12 }}>{actionError}</div>
+              )}
 
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                 {me && (
@@ -614,7 +651,6 @@ export default function GameRoom({ roomId }: GameRoomProps) {
           backdropFilter: 'blur(8px)',
           flexShrink: 0,
         }}>
-          {/* Selection info */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 13, color: 'rgba(245,240,232,0.45)' }}>
               Bài của bạn ({myHand.length} lá)
@@ -630,37 +666,38 @@ export default function GameRoom({ roomId }: GameRoomProps) {
               )}
             </div>
 
-            {isMyTurn && (
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                {actionError && (
-                  <span style={{ color: '#e74c3c', fontSize: 13 }}>{actionError}</span>
-                )}
-                <button
-                  className="btn-secondary"
-                  onClick={pass}
-                  disabled={!room.lastPlay || room.lastPlayerId === user?.id}
-                  style={{ fontSize: 13, padding: '6px 16px' }}
-                >
-                  Bỏ Qua
-                </button>
-                <button
-                  className="btn-primary"
-                  onClick={playCards}
-                  disabled={!currentPlay || !canPlaySelected || !isMyTurn}
-                  style={{ fontSize: 14, padding: '8px 20px' }}
-                >
-                  Đánh Bài
-                </button>
-              </div>
-            )}
-            {!isMyTurn && room.status === 'playing' && (
-              <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 13 }}>
-                Chờ đến lượt bạn...
-              </span>
-            )}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {actionError && (
+                <span style={{ color: '#e74c3c', fontSize: 13 }}>{actionError}</span>
+              )}
+              {isMyTurn && (
+                <>
+                  <button
+                    className="btn-secondary"
+                    onClick={pass}
+                    disabled={!room.lastPlay || room.lastPlayerId === user?.id}
+                    style={{ fontSize: 13, padding: '6px 16px' }}
+                  >
+                    Bỏ Qua
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={playCards}
+                    disabled={!currentPlay || !canPlaySelected}
+                    style={{ fontSize: 14, padding: '8px 20px' }}
+                  >
+                    Đánh Bài
+                  </button>
+                </>
+              )}
+              {!isMyTurn && (
+                <span style={{ color: 'rgba(245,240,232,0.3)', fontSize: 13 }}>
+                  Chờ đến lượt bạn...
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Hand */}
           <div style={{
             display: 'flex',
             overflowX: 'auto',
@@ -669,11 +706,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
             paddingTop: 20,
             justifyContent: 'center',
           }}>
-            <div style={{
-              display: 'flex',
-              position: 'relative',
-              minWidth: 'fit-content',
-            }}>
+            <div style={{ display: 'flex', position: 'relative', minWidth: 'fit-content' }}>
               {myHand.map((card: Card, idx: number) => {
                 const isFlying = flyingCards.includes(card.id);
                 const isSelected = selectedCards.includes(card.id);
@@ -691,9 +724,9 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                     <CardComponent
                       card={card}
                       selected={isSelected && !isFlying}
-                      onClick={() => isMyTurn && !isFlying ? toggleCard(card.id) : undefined}
+                      onClick={() => !isFlying ? toggleCard(card.id) : undefined}
                       size="lg"
-                      disabled={!isMyTurn || isFlying}
+                      disabled={isFlying}
                     />
                   </div>
                 );
