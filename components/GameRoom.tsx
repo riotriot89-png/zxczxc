@@ -32,7 +32,14 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       const res = await fetch(`/api/rooms/${roomId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) { router.push('/'); return; }
+      if (!res.ok) {
+        // Only redirect if room truly doesn't exist AND we haven't loaded any room data yet
+        // (prevents kicking players out due to transient server errors mid-game)
+        if (res.status === 404) {
+          setRoom(prev => { if (!prev) router.push('/'); return prev; });
+        }
+        return;
+      }
       const data = await res.json();
       // Only hard-replace if turn/status actually advanced (avoid stomping optimistic state)
       setRoom(prev => {
@@ -52,6 +59,13 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     fetchRoom();
 
     // Poll as fallback (Pusher may not be configured)
+    // Poll fast initially to catch game-started transition, then slow down
+    let fastPollCount = 0;
+    const fastPoll = setInterval(() => {
+      fetchRoom();
+      fastPollCount++;
+      if (fastPollCount >= 6) clearInterval(fastPoll); // stop after 12s fast polling
+    }, 2000);
     pollRef.current = setInterval(fetchRoom, 8000); // safety net only, optimistic updates handle UI
 
     // Try Pusher
@@ -93,7 +107,10 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         roomChannel.bind('room-updated', handleUpdate);
         roomChannel.bind('game-started', (data: any) => {
           // game-started on room channel has hidden hands — fetch our real hand immediately
+          // Retry a few times in case of transient server errors (serverless cold start etc.)
           fetchRoom();
+          setTimeout(fetchRoom, 800);
+          setTimeout(fetchRoom, 2000);
         });
         roomChannel.bind('player-played', handleUpdate);
         roomChannel.bind('player-passed', handleUpdate);
