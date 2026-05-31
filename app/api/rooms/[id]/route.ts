@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getRoom, setRoom } from '@/lib/store';
@@ -11,7 +12,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const room = getRoom(id);
   if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
 
-  // Return room data, masking other players' hands
   const sanitized = {
     ...room,
     players: room.players.map(p => ({
@@ -31,40 +31,42 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const room = getRoom(id);
   if (!room) return NextResponse.json({ error: 'Phòng không tồn tại' }, { status: 404 });
 
-  const { password } = await req.json();
+  // If already in room, allow always (reconnect/refresh)
+  const alreadyIn = room.players.find(p => p.id === authUser.id);
+  if (alreadyIn) {
+    return NextResponse.json({ ok: true });
+  }
+
+  // New player trying to join
+  const { password } = await req.json().catch(() => ({ password: '' }));
 
   if (room.password && room.password !== password) {
     return NextResponse.json({ error: 'Sai mật khẩu phòng' }, { status: 403 });
   }
 
-  // Check if already in room — if so, always allow (reconnect/refresh scenario)
-  const alreadyIn = room.players.find(p => p.id === authUser.id);
-
-  if (room.status !== 'waiting' && !alreadyIn) {
+  if (room.status !== 'waiting') {
     return NextResponse.json({ error: 'Ván đang diễn ra' }, { status: 400 });
   }
 
-  if (!alreadyIn && room.players.length >= room.maxPlayers) {
+  if (room.players.length >= room.maxPlayers) {
     return NextResponse.json({ error: 'Phòng đã đầy' }, { status: 400 });
   }
 
-  if (!alreadyIn) {
-    room.players.push({
-      id: authUser.id,
-      username: authUser.username,
-      hand: [],
-      score: 0,
-      isReady: false,
-      isConnected: true,
-    });
-    setRoom(room);
+  room.players.push({
+    id: authUser.id,
+    username: authUser.username,
+    hand: [],
+    score: 0,
+    isReady: false,
+    isConnected: true,
+  });
+  setRoom(room);
 
-    await pusherServer.trigger(`room-${id}`, PUSHER_EVENTS.PLAYER_JOINED, {
-      playerId: authUser.id,
-      username: authUser.username,
-      room: sanitizeRoom(room, authUser.id),
-    }).catch(() => {});
-  }
+  await pusherServer.trigger(`room-${id}`, PUSHER_EVENTS.PLAYER_JOINED, {
+    playerId: authUser.id,
+    username: authUser.username,
+    room: sanitizeRoom(room, authUser.id),
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }
