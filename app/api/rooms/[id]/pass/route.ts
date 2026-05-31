@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { getRoom, setRoom } from '@/lib/store';
@@ -20,39 +21,42 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Chưa đến lượt bạn' }, { status: 400 });
   }
 
-  // Can't pass if no last play (must play)
   if (!room.lastPlay || room.lastPlayerId === authUser.id) {
     return NextResponse.json({ error: 'Bạn phải đánh bài' }, { status: 400 });
   }
 
+  const activePlayers = room.players.filter(p => p.hand.length > 0 && p.finishPosition === undefined);
+
   room.passCount += 1;
   room.turn += 1;
 
-  // Count active players
-  const activePlayers = room.players.filter(p => p.hand.length > 0 && p.finishPosition === undefined);
-  
-  // If everyone else passed, current lastPlayerId gets to play freely
+  // If everyone else passed → round winner gets to play freely
   if (room.passCount >= activePlayers.length - 1) {
+    // Save winner ID BEFORE resetting
+    const roundWinnerId = room.lastPlayerId;
     room.lastPlay = null;
     room.lastPlayerId = null;
     room.passCount = 0;
-    // Next player is the one who played last (round winner)
-    const winnerIndex = room.players.findIndex(p => p.id === room.lastPlayerId);
-    if (winnerIndex !== -1) {
+
+    const winnerIndex = room.players.findIndex(p => p.id === roundWinnerId);
+    if (winnerIndex !== -1 && room.players[winnerIndex].hand.length > 0 && room.players[winnerIndex].finishPosition === undefined) {
       room.currentPlayerIndex = winnerIndex;
     } else {
-      // Find next active player
+      // Find next active player from current position
       let nextIndex = (room.currentPlayerIndex + 1) % room.players.length;
-      while (room.players[nextIndex].hand.length === 0 || room.players[nextIndex].finishPosition !== undefined) {
+      let safety = 0;
+      while ((room.players[nextIndex].hand.length === 0 || room.players[nextIndex].finishPosition !== undefined) && safety < room.players.length) {
         nextIndex = (nextIndex + 1) % room.players.length;
+        safety++;
       }
       room.currentPlayerIndex = nextIndex;
     }
   } else {
-    // Next active player
     let nextIndex = (room.currentPlayerIndex + 1) % room.players.length;
-    while (room.players[nextIndex].hand.length === 0 || room.players[nextIndex].finishPosition !== undefined) {
+    let safety = 0;
+    while ((room.players[nextIndex].hand.length === 0 || room.players[nextIndex].finishPosition !== undefined) && safety < room.players.length) {
       nextIndex = (nextIndex + 1) % room.players.length;
+      safety++;
     }
     room.currentPlayerIndex = nextIndex;
   }
@@ -73,6 +77,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       room: playerView,
     }).catch(() => {});
   }
+
+  // Also update room channel (hidden hands for all)
+  const publicRoom = {
+    ...room,
+    players: room.players.map(p => ({
+      ...p,
+      hand: p.hand.map(() => ({ id: 'hidden' as const, suit: 'hidden' as const, rank: 'hidden' as const })),
+    })),
+  };
+  await pusherServer.trigger(`room-${id}`, PUSHER_EVENTS.PLAYER_PASSED, {
+    playerId: authUser.id,
+    room: publicRoom,
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true });
 }
