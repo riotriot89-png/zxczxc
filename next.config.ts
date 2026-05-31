@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Ensure API routes are always dynamic (important for in-memory store on Vercel)
+  experimental: {},
 };
 
 export default nextConfig;
