@@ -212,10 +212,10 @@ export default function Lobby() {
                   {room.status === 'playing' && (
                     <button
                       className="btn-secondary"
-                      onClick={() => joinRoom(room, joinPassword)}
+                      onClick={() => router.push(`/room/${room.id}`)}
                       style={{ fontSize: 14 }}
                     >
-                      Xem
+                      Xem / Vào Lại
                     </button>
                   )}
                 </div>
